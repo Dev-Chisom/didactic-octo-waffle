@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Series – Create & view content</title>
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --surface: #1a1a20;
+      --border: #2a2a32;
+      --text: #e8e8ed;
+      --muted: #8888a0;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --success: #22c55e;
+      --error: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    h1 { font-size: 1.5rem; margin: 0 0 0.5rem 0; }
+    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    section h2 { font-size: 1rem; margin: 0 0 1rem 0; color: var(--muted); font-weight: 600; }
+    label { display: block; font-size: 0.85rem; margin-bottom: 0.35rem; color: var(--muted); }
+    input, select {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 1rem;
+      margin-bottom: 1rem;
+    }
+    button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button:hover { background: var(--accent-hover); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .message { font-size: 0.9rem; margin-top: 0.75rem; padding: 0.5rem 0; }
+    .message.success { color: var(--success); }
+    .message.error { color: var(--error); }
+    .cards { display: flex; flex-direction: column; gap: 0.75rem; }
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .card .name { font-weight: 600; }
+    .card .meta { font-size: 0.8rem; color: var(--muted); }
+    .card .status {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      background: var(--border);
+      color: var(--muted);
+      text-transform: capitalize;
+    }
+    .card .status.active { background: rgba(34,197,94,0.2); color: var(--success); }
+    .card .status.draft { background: rgba(99,102,241,0.2); color: var(--accent); }
+    .card.clickable { cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+    .card.clickable:hover { border-color: var(--accent); background: #1e1e26; }
+    .card.clickable.selected { border-color: var(--accent); background: rgba(99,102,241,0.12); }
+    .user-badge { font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem; }
+    .user-badge strong { color: var(--text); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .content-layout { display: flex; gap: 1.5rem; align-items: flex-start; max-width: 1200px; margin-top: 1rem; }
+    .content-layout .left { flex: 0 0 320px; }
+    .content-layout .right {
+      flex: 1;
+      min-width: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      min-height: 320px;
+    }
+    .right h3 { margin: 0 0 0.5rem 0; font-size: 1.1rem; }
+    .right .empty { color: var(--muted); padding: 2rem; text-align: center; }
+    .episode-list { display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem; }
+    .episode-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+    }
+    .episode-item .ep-title { font-weight: 600; margin-bottom: 0.35rem; }
+    .episode-item .ep-meta { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem; }
+    .episode-item .ep-script { font-size: 0.9rem; color: var(--muted); max-height: 4em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .episode-item video {
+      width: 100%;
+      border-radius: 8px;
+      margin-top: 0.75rem;
+      background: #000;
+    }
+    .episode-item .no-video { font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem; }
+    .episode-item .watch-link { display: inline-block; margin-top: 0.5rem; font-size: 0.9rem; }
+    .episode-item .gen-row { margin-top: 0.75rem; }
+    .episode-item button.generate-btn {
+      font-size: 0.85rem;
+      padding: 0.4rem 0.8rem;
+    }
+    .episode-item button.generate-btn:disabled { opacity: 0.7; cursor: wait; }
+    .episode-item.ready-for-review { border-left: 3px solid var(--success); }
+    .episode-item .full-script {
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      background: var(--bg);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 12em;
+      overflow-y: auto;
+    }
+    .episode-item .script-label { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.35rem; }
+    .filter-row { margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .filter-row label { margin: 0; display: inline; }
+    .filter-row select { width: auto; margin: 0; }
+  </style>
+</head>
+<body>
+  <h1>AI Series Dashboard</h1>
+  <p class="sub">Create content and see it here. Use this page to confirm the backend is on track.</p>
+
+  <section id="auth-section">
+    <h2>1. Sign in</h2>
+    <div id="user-badge" class="user-badge" style="display: none;"></div>
+    <form id="login-form" style="display: none;">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="you@example.com" required />
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="••••••••" required />
+      <button type="submit">Sign in</button>
+    </form>
+    <div id="auth-message" class="message"></div>
+  </section>
+
+  <section id="create-section" style="display: none;">
+    <h2>2. Create content (series)</h2>
+    <form id="create-form">
+      <label for="name">Series name</label>
+      <input type="text" id="name" placeholder="e.g. Daily Motivation" value="My First Series" />
+      <label for="contentType">Content type</label>
+      <select id="contentType">
+        <option value="motivation">Motivation</option>
+        <option value="horror">Horror</option>
+        <option value="finance">Finance</option>
+        <option value="ai_tech">AI & Tech</option>
+        <option value="kids">Kids</option>
+        <option value="anime">Anime</option>
+        <option value="custom">Custom</option>
+      </select>
+      <button type="submit">Create series</button>
+    </form>
+    <div id="create-message" class="message"></div>
+  </section>
+
+  <section id="list-section" style="display: none;">
+    <h2>3. Your content – view & watch</h2>
+    <p class="sub" style="margin-bottom: 0.5rem;">Click a series to view its episodes and watch videos.</p>
+    <div id="list-refresh">
+      <button type="button" id="refresh-btn">Refresh list</button>
+    </div>
+    <div class="content-layout">
+      <div class="left">
+        <div id="series-cards" class="cards"></div>
+        <div id="list-message" class="message"></div>
+      </div>
+      <div class="right" id="detail-panel">
+        <div id="detail-empty" class="empty">Select a series to view episodes and watch videos.</div>
+        <div id="detail-content" style="display: none;">
+          <h3 id="detail-series-name"></h3>
+          <p class="sub" id="detail-series-meta" style="margin: 0 0 0.5rem 0;"></p>
+          <div class="filter-row">
+            <label for="episode-filter">Show:</label>
+            <select id="episode-filter">
+              <option value="all">All episodes</option>
+              <option value="ready_for_review">Ready for review only</option>
+            </select>
+          </div>
+          <div id="episode-list" class="episode-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="sub" style="margin-top: 2rem;">
+    API docs: <a href="/docs" target="_blank" rel="noopener">/docs</a> · Backend: same origin
+  </p>
+
+  <script>
+    const API = '/api/v1';
+    const TOKEN_KEY = 'demo_access_token';
+
+    function getToken() { return localStorage.getItem(TOKEN_KEY); }
+    function setToken(t) { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); }
+
+    function headers(includeAuth = true) {
+      const h = { 'Content-Type': 'application/json' };
+      if (includeAuth && getToken()) h['Authorization'] = 'Bearer ' + getToken();
+      return h;
+    }
+
+    function show(el, show) { el.style.display = show ? 'block' : 'none'; }
+    function message(el, text, type) {
+      el.textContent = text || '';
+      el.className = 'message' + (type ? ' ' + type : '');
+    }
+
+    async function login(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const msgEl = document.getElementById('auth-message');
+      try {
+        const r = await fetch(API + '/auth/login', {
+          method: 'POST',
+          headers: headers(false),
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          message(msgEl, data.detail || 'Login failed', 'error');
+          return;
+        }
+        setToken(data.tokens?.accessToken);
+        message(msgEl, 'Signed in.', 'success');
+        showLoggedIn(data.user?.email || email);
+        show(document.getElementById('create-section'), true);
+        show(document.getElementById('list-section'), true);
+        document.getElementById('login-form').style.display = 'none';
+        loadSeries();
+      } catch (err) {
+        message(msgEl, 'Network error: ' + err.message, 'error');
+      }
+    }
+
+    function showLoggedIn(email) {
+      const badge = document.getElementById('user-badge');
+      badge.innerHTML = 'Signed in as <strong>' + (email || '') + '</strong>';
+      show(badge, true);
+    }
+
+    async function createSeries(e) {
+      e.preventDefault();
+      const name = document.getElementById('name').value.trim() || 'Untitled Series';
+      const contentType = document.getElementById('contentType').value;
+      const msgEl = document.getElementById('create-message');
+      try {
+        const r = await fetch(API + '/series', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ name, contentType }),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          message(msgEl, data.detail || 'Create failed', 'error');
+          return;
+        }
+        message(msgEl, 'Created: ' + (data.name || name), 'success');
+        document.getElementById('name').value = '';
+        loadSeries();
+      } catch (err) {
+        message(msgEl, 'Network error: ' + err.message, 'error');
+      }
+    }
+
+    async function loadSeries() {
+      const container = document.getElementById('series-cards');
+      const msgEl = document.getElementById('list-message');
+      container.innerHTML = '';
+      message(msgEl, '');
+      try {
+        const r = await fetch(API + '/series', { headers: headers() });
+        if (r.status === 401) {
+          setToken(null);
+          show(document.getElementById('login-form'), true);
+          show(document.getElementById('user-badge'), false);
+          show(document.getElementById('create-section'), false);
+          show(document.getElementById('list-section'), false);
+          message(msgEl, 'Session expired. Sign in again.', 'error');
+          return;
+        }
+        const list = await r.json();
+        if (!r.ok) {
+          message(msgEl, list.detail || 'Failed to load series', 'error');
+          return;
+        }
+        if (!list.length) {
+          message(msgEl, 'No series yet. Create one above.', '');
+          return;
+        }
+        list.forEach(s => {
+          const card = document.createElement('div');
+          card.className = 'card clickable';
+          card.dataset.seriesId = s.id;
+          const statusClass = (s.status === 'active') ? 'active' : 'draft';
+          const name = (s.name || 'Untitled').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const meta = ((s.contentType || '') + ' · ' + (s.id || '').slice(0, 8) + '…').replace(/</g, '&lt;');
+          card.innerHTML = [
+            '<div>',
+            '  <div class="name">' + name + '</div>',
+            '  <div class="meta">' + meta + '</div>',
+            '</div>',
+            '<span class="status ' + statusClass + '">' + (s.status || 'draft') + '</span>',
+          ].join('');
+          card.addEventListener('click', () => selectSeries(s));
+          container.appendChild(card);
+        });
+        if (selectedSeries && list.some(function(s) { return s.id === selectedSeries.id; })) {
+          const s = list.find(function(x) { return x.id === selectedSeries.id; });
+          selectSeries(s);
+        } else if (selectedSeries) {
+          selectedSeries = null;
+          document.getElementById('detail-empty').style.display = 'block';
+          document.getElementById('detail-content').style.display = 'none';
+        }
+      } catch (err) {
+        message(msgEl, 'Network error: ' + err.message, 'error');
+      }
+    }
+
+    let selectedSeries = null;
+
+    function selectSeries(series) {
+      selectedSeries = series || null;
+      document.querySelectorAll('#series-cards .card.clickable').forEach(c => {
+        c.classList.toggle('selected', c.dataset.seriesId === (series ? series.id : null));
+      });
+      if (!series) {
+        document.getElementById('detail-empty').style.display = 'block';
+        document.getElementById('detail-content').style.display = 'none';
+        return;
+      }
+      document.getElementById('detail-empty').style.display = 'none';
+      document.getElementById('detail-content').style.display = 'block';
+      document.getElementById('detail-series-name').textContent = series.name || 'Untitled';
+      document.getElementById('detail-series-meta').textContent = (series.contentType || '') + ' · ' + (series.status || 'draft');
+      loadEpisodes(series.id);
+    }
+
+    async function generateVideo(episodeId, btn) {
+      if (!episodeId || !selectedSeries) return;
+      btn.disabled = true;
+      btn.textContent = 'Starting…';
+      try {
+        const r = await fetch(API + '/episodes/' + episodeId + '/generate-media', {
+          method: 'POST',
+          headers: headers(),
+        });
+        const data = await r.json();
+        if (r.ok) {
+          btn.textContent = 'Queued — refresh in ~1 min';
+          if (selectedSeries) loadEpisodes(selectedSeries.id);
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Generate video';
+          alert(data.detail || 'Failed to start video generation');
+        }
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Generate video';
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function generateEpisode(episodeId, btn) {
+      if (!episodeId || !selectedSeries) return;
+      btn.disabled = true;
+      btn.textContent = 'Generating…';
+      try {
+        const r = await fetch(API + '/episodes/' + episodeId + '/generate', {
+          method: 'POST',
+          headers: headers(),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          alert(data.detail || 'Generate failed');
+          btn.disabled = false;
+          btn.textContent = 'Generate script';
+          return;
+        }
+        if (selectedSeries) loadEpisodes(selectedSeries.id);
+      } catch (err) {
+        alert('Error: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = 'Generate script';
+      }
+    }
+
+    let cachedEpisodes = [];
+
+    function renderEpisodes(episodes) {
+      const container = document.getElementById('episode-list');
+      const filter = (document.getElementById('episode-filter') && document.getElementById('episode-filter').value) || 'all';
+      const list = filter === 'ready_for_review' ? episodes.filter(function(ep) { return ep.status === 'ready_for_review'; }) : episodes;
+      container.innerHTML = '';
+      if (!list.length) {
+        container.innerHTML = filter === 'ready_for_review'
+          ? '<p class="empty">No episodes ready for review. Generate scripts for scheduled episodes first.</p>'
+          : '<p class="empty">No episodes yet. Launch this series to schedule episodes.</p>';
+        return;
+      }
+      list.forEach(function(ep) {
+        const div = document.createElement('div');
+        var isReady = ep.status === 'ready_for_review';
+        div.className = 'episode-item' + (isReady ? ' ready-for-review' : '');
+        const title = 'Episode ' + (ep.episodeNumber || ep.sequenceNumber || '—');
+        const meta = (ep.status || '') + (ep.seriesName ? ' · ' + ep.seriesName : '');
+        let inner = '<div class="ep-title">' + title.replace(/</g, '&lt;') + '</div>';
+        inner += '<div class="ep-meta">' + meta.replace(/</g, '&lt;') + '</div>';
+        if (ep.script) {
+          var safeFull = String(ep.script).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+          if (isReady || ep.status === 'generating' || ep.videoUrl) {
+            inner += '<div class="script-label">Script (ready for review)</div>';
+            inner += '<div class="full-script">' + safeFull + '</div>';
+          } else {
+            var safe = String(ep.script).slice(0, 200).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            inner += '<div class="ep-script" title="' + safe + '">' + safe + (ep.script.length > 200 ? '…' : '') + '</div>';
+          }
+        }
+        if (ep.videoUrl) {
+          inner += '<video controls preload="metadata" src="' + ep.videoUrl.replace(/"/g, '&quot;') + '">Your browser does not support video.</video>';
+          inner += '<a class="watch-link" href="' + ep.videoUrl.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener">Open video in new tab</a>';
+        } else {
+          var hasScript = !!ep.script;
+          var isGenerating = ep.status === 'generating';
+          if (hasScript && !isGenerating) {
+            inner += '<div class="no-video">Script ready. Generate video (TTS + render) below.</div>';
+            inner += '<div class="gen-row"><button type="button" class="generate-btn video-btn" data-episode-id="' + ep.id + '">Generate video</button></div>';
+          } else if (hasScript && isGenerating) {
+            inner += '<div class="no-video">Generating video… Refresh in a minute to see it.</div>';
+          } else {
+            inner += '<div class="no-video">No video yet — status: ' + (ep.status || 'scheduled') + '. Generate script first.</div>';
+            var canGenerate = (ep.status === 'scheduled' || ep.status === 'failed');
+            if (canGenerate) {
+              inner += '<div class="gen-row"><button type="button" class="generate-btn" data-episode-id="' + ep.id + '">Generate script</button></div>';
+            }
+          }
+        }
+        div.innerHTML = inner;
+        container.appendChild(div);
+        var genBtn = div.querySelector('button.generate-btn');
+        if (genBtn) {
+          if (genBtn.classList.contains('video-btn')) {
+            genBtn.addEventListener('click', function() { generateVideo(ep.id, this); });
+          } else {
+            genBtn.addEventListener('click', function() { generateEpisode(ep.id, this); });
+          }
+        }
+      });
+    }
+
+    async function loadEpisodes(seriesId) {
+      const container = document.getElementById('episode-list');
+      container.innerHTML = '';
+      try {
+        const r = await fetch(API + '/episodes?seriesId=' + encodeURIComponent(seriesId), { headers: headers() });
+        if (!r.ok) {
+          const data = await r.json();
+          container.innerHTML = '<p class="empty">Could not load episodes: ' + (data.detail || r.status) + '</p>';
+          return;
+        }
+        const episodes = await r.json();
+        cachedEpisodes = episodes;
+        if (!episodes.length) {
+          container.innerHTML = '<p class="empty">No episodes yet. Launch this series to schedule episodes.</p>';
+          return;
+        }
+        renderEpisodes(episodes);
+      } catch (err) {
+        container.innerHTML = '<p class="empty">Network error: ' + err.message + '</p>';
+      }
+    }
+
+    document.getElementById('login-form').addEventListener('submit', login);
+    document.getElementById('create-form').addEventListener('submit', createSeries);
+    document.getElementById('refresh-btn').addEventListener('click', loadSeries);
+    var filterEl = document.getElementById('episode-filter');
+    if (filterEl) filterEl.addEventListener('change', function() { renderEpisodes(cachedEpisodes); });
+
+    if (getToken()) {
+      (async () => {
+        try {
+          const r = await fetch(API + '/me', { headers: headers() });
+          if (r.ok) {
+            const data = await r.json();
+            showLoggedIn(data.user?.email);
+            show(document.getElementById('login-form'), false);
+            show(document.getElementById('create-section'), true);
+            show(document.getElementById('list-section'), true);
+            loadSeries();
+          } else {
+            setToken(null);
+            show(document.getElementById('login-form'), true);
+          }
+        } catch {
+          show(document.getElementById('login-form'), true);
+        }
+      })();
+    } else {
+      show(document.getElementById('login-form'), true);
+    }
+  </script>
+</body>
+</html>
