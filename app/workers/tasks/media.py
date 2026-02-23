@@ -108,7 +108,12 @@ def generate_media(self, episode_id: str):
             scene_refs = []
             for idx, scene in enumerate(script.scenes):
                 text = (scene.get("text") or "").strip()
-                vis = (scene.get("visual_description") or text[:500]).strip()
+                # Never fall back to narration text for image prompts: it can cause the image model
+                # to "render" on-image captions (gibberish/watermarks). Use a safe generic visual
+                # prompt if the LLM didn't provide a visual_description.
+                vis = (scene.get("visual_description") or "").strip()
+                if not vis:
+                    vis = "soft abstract atmospheric background, gentle gradients, cinematic lighting, no text"
                 if not text:
                     raise ValueError(f"Scene {idx + 1} has no text")
                 audio_bytes = tts_synthesize(text, voice_id=voice_id)

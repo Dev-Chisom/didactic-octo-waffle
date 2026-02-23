@@ -16,11 +16,19 @@ def _client() -> redis.Redis:
     return redis.from_url(settings.redis_url, decode_responses=True)
 
 
-def set_oauth_state(state: str, workspace_id: str, platform: str) -> None:
-    """Store state -> {workspace_id, platform} in Redis."""
+def set_oauth_state(
+    state: str,
+    workspace_id: str,
+    platform: str,
+    extra: Optional[dict[str, Any]] = None,
+) -> None:
+    """Store state -> {workspace_id, platform, ...extra} in Redis."""
     client = _client()
     key = f"{STATE_PREFIX}{state}"
-    value = json.dumps({"workspace_id": str(workspace_id), "platform": platform})
+    payload: dict[str, Any] = {"workspace_id": str(workspace_id), "platform": platform}
+    if extra:
+        payload.update(extra)
+    value = json.dumps(payload)
     client.setex(key, STATE_TTL_SECONDS, value)
 
 

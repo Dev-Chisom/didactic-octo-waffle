@@ -63,10 +63,19 @@ class Settings(BaseSettings):
     # Frontend
     cors_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     frontend_url: str = "http://localhost:3000"
+    public_base_url: Optional[str] = Field(
+        default=None,
+        description="Public-facing base URL for OAuth redirects (scheme + host).",
+        validation_alias=AliasChoices("PUBLIC_BASE_URL", "BACKEND_PUBLIC_URL", "API_PUBLIC_BASE_URL"),
+    )
 
     # Social OAuth
     tiktok_client_key: str = ""
     tiktok_client_secret: str = ""
+    tiktok_scopes: str = Field(
+        default="user.info.basic,video.list,video.upload",
+        validation_alias=AliasChoices("TIKTOK_SCOPES", "TIKTOK_OAUTH_SCOPES"),
+    )
     instagram_client_id: str = ""
     instagram_client_secret: str = ""
     youtube_client_id: str = ""

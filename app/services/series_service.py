@@ -10,6 +10,7 @@ from app.db.models.series import Series
 from app.db.models.episode import Episode, Script
 from app.db.models.workspace import Workspace
 from app.services.credits_service import estimate_credits_per_episode
+from app.services.schedule_slots import get_next_publish_slots
 
 
 def create_series(
@@ -164,15 +165,15 @@ def launch_series(
     balance = workspace.credits_balance or 0
     schedule = series.schedule or {}
     frequency = schedule.get("frequency", "daily")
-    # Schedule next 7 episodes as placeholder
+    # Schedule next 7 episodes at future publish slots (so they show on Scheduled posts)
+    slots = get_next_publish_slots(schedule, count=7)
     upcoming = []
-    start = datetime.now(timezone.utc)
-    for i in range(1, 8):
+    for i, slot_utc in enumerate(slots, start=1):
         ep = Episode(
             id=uuid.uuid4(),
             series_id=series.id,
             sequence_number=i,
-            scheduled_at=start,
+            scheduled_at=slot_utc,
             status="scheduled",
         )
         db.add(ep)

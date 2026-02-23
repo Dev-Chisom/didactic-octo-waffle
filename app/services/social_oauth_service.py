@@ -14,11 +14,17 @@ from app.core.oauth_state import get_oauth_state, set_oauth_state
 
 
 def _redirect_uri(base_url: str, platform: str) -> str:
-    return f"{base_url.rstrip('/')}/api/v1/social/connect/{platform}/callback"
+    settings = get_settings()
+    return f"{base_url.rstrip('/')}{settings.api_v1_prefix}/social/connect/{platform}/callback"
 
 
-def store_state_and_return(state: str, workspace_id: UUID, platform: str) -> None:
-    set_oauth_state(state, str(workspace_id), platform)
+def store_state_and_return(
+    state: str,
+    workspace_id: UUID,
+    platform: str,
+    extra: Optional[dict[str, Any]] = None,
+) -> None:
+    set_oauth_state(state, str(workspace_id), platform, extra=extra)
 
 
 # --- TikTok ---
@@ -27,7 +33,12 @@ def _tiktok_exchange(
     redirect_uri: str,
     client_key: str,
     client_secret: str,
+    code_verifier: Optional[str],
 ) -> dict[str, Any]:
+    if not code_verifier:
+        raise ValueError(
+            "Missing PKCE code_verifier for TikTok OAuth. Please try connecting again."
+        )
     resp = httpx.post(
         "https://open.tiktokapis.com/v2/oauth/token/",
         headers={"Content-Type": "application/x-www-form-urlencoded"},
@@ -37,28 +48,34 @@ def _tiktok_exchange(
             "code": code,
             "grant_type": "authorization_code",
             "redirect_uri": redirect_uri,
+            "code_verifier": code_verifier,
         },
         timeout=15.0,
     )
     resp.raise_for_status()
     data = resp.json()
-    if data.get("error"):
-        raise ValueError(data.get("message", data.get("error", "TikTok token error")))
+    err = data.get("error")
+    if isinstance(err, dict) and err.get("code") and err.get("code") != "ok":
+        raise ValueError(err.get("message") or f"TikTok token error: {err.get('code')}")
+    if isinstance(err, str) and err:
+        raise ValueError(data.get("message") or f"TikTok token error: {err}")
     return data
 
 
 def _tiktok_user_info(access_token: str) -> dict[str, Any]:
-    resp = httpx.post(
+    resp = httpx.get(
         "https://open.tiktokapis.com/v2/user/info/",
         headers={
             "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
         },
-        json={"fields": "open_id,union_id,avatar_url,display_name"},
+        params={"fields": "open_id,union_id,avatar_url,display_name"},
         timeout=10.0,
     )
     resp.raise_for_status()
     d = resp.json()
+    err = d.get("error")
+    if isinstance(err, dict) and err.get("code") and err.get("code") != "ok":
+        raise ValueError(err.get("message") or f"TikTok user info error: {err.get('code')}")
     user = (d.get("data", {}).get("user") or {})
     return {
         "platform_user_id": user.get("open_id") or user.get("union_id") or "",
@@ -196,6 +213,7 @@ def handle_oauth_callback(
     workspace_id = data.get("workspace_id")
     if not workspace_id:
         return None, "Invalid state payload"
+    code_verifier = data.get("code_verifier")
 
     settings = get_settings()
     platform = (platform or "").lower()
@@ -206,7 +224,11 @@ def handle_oauth_callback(
             if not settings.tiktok_client_key or not settings.tiktok_client_secret:
                 return None, "TikTok OAuth not configured"
             token_data = _tiktok_exchange(
-                code, redirect_uri, settings.tiktok_client_key, settings.tiktok_client_secret
+                code,
+                redirect_uri,
+                settings.tiktok_client_key,
+                settings.tiktok_client_secret,
+                code_verifier,
             )
             access_token = token_data.get("access_token")
             refresh_token = token_data.get("refresh_token")

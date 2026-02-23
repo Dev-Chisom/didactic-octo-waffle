@@ -159,7 +159,7 @@ def generate_script_scenes(
         "For each scene provide: "
         '"scene" (1-based index), '
         '"text" (the exact narration for that scene, one or two sentences), '
-        '"visual_description" (short cinematic visual for that moment: setting, mood, no text). '
+        '"visual_description" (short cinematic visual for that moment: setting, mood. MUST contain no text/letters/words/subtitles/signage/watermarks). '
         "Keep visual_description under 100 words, cinematic and concrete. "
         "Output a JSON array only, e.g. [{\"scene\":1,\"text\":\"...\",\"visual_description\":\"...\"}, ...]"
     )

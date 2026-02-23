@@ -1,3 +1,5 @@
+import base64
+import hashlib
 import secrets
 from urllib.parse import urlencode, quote
 from uuid import UUID
@@ -19,9 +21,19 @@ from app.services.social_oauth_service import store_state_and_return
 router = APIRouter(prefix="/social", tags=["social"])
 
 
+def _public_base_url(request: Request) -> str:
+    settings = get_settings()
+    if settings.public_base_url:
+        return settings.public_base_url.rstrip("/")
+    scheme = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    return f"{scheme}://{host}".rstrip("/")
+
+
 def _redirect_uri(request: Request, platform: str) -> str:
-    base = str(request.base_url).rstrip("/")
-    return f"{base}/api/v1/social/connect/{platform}/callback"
+    settings = get_settings()
+    base = _public_base_url(request)
+    return f"{base}{settings.api_v1_prefix}/social/connect/{platform}/callback"
 
 
 def _build_connect_url(request: Request, platform: str, workspace_id: UUID) -> str:
@@ -36,15 +48,32 @@ def _build_connect_url(request: Request, platform: str, workspace_id: UUID) -> s
             )
         redirect_uri = _redirect_uri(request, "tiktok")
         state = secrets.token_urlsafe(16)
-        store_state_and_return(state, workspace_id, "tiktok")
+        # PKCE for TikTok OAuth (required).
+        code_verifier = secrets.token_urlsafe(64)
+        code_challenge = (
+            base64.urlsafe_b64encode(
+                hashlib.sha256(code_verifier.encode("ascii")).digest()
+            )
+            .decode("ascii")
+            .rstrip("=")
+        )
+        store_state_and_return(
+            state,
+            workspace_id,
+            "tiktok",
+            extra={"code_verifier": code_verifier},
+        )
         params = {
             "client_key": settings.tiktok_client_key,
-            "scope": "user.info.basic,video.list,video.upload",
+            "scope": settings.tiktok_scopes,
             "response_type": "code",
             "redirect_uri": redirect_uri,
             "state": state,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
         }
-        return "https://www.tiktok.com/auth/authorize/?" + urlencode(params)
+        # TikTok OAuth v2 (Login Kit) endpoint. v1 (/auth/authorize/) is EOL.
+        return "https://www.tiktok.com/v2/auth/authorize/?" + urlencode(params)
 
     if platform == "instagram":
         if not settings.instagram_client_id:
@@ -163,18 +192,18 @@ def connect_callback(platform: str, request: Request, db: DbSession):
     state = params.get("state") or ""
     code = params.get("code")
     error = params.get("error") or params.get("error_description")
-    base_url = str(request.base_url).rstrip("/")
+    base_url = _public_base_url(request)
     settings = get_settings()
     frontend = settings.frontend_url.rstrip("/")
 
     account, err = handle_oauth_callback(db, platform, state, code, base_url, error_from_platform=error)
     if err:
         return RedirectResponse(
-            url=f"{frontend}/settings/accounts?error={quote(err)}",
+            url=f"{frontend}/social-accounts?error={quote(err)}",
             status_code=302,
         )
     return RedirectResponse(
-        url=f"{frontend}/settings/accounts?connected=1&platform={platform}",
+        url=f"{frontend}/social-accounts?connected=1&platform={platform}",
         status_code=302,
     )
 
