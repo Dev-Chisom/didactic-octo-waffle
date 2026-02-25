@@ -30,3 +30,6 @@ openai>=1.0.0
 python-multipart
 python-dateutil
 cryptography>=42.0.0
+
+# Reel engine (caption rasterization)
+pillow>=10.0.0

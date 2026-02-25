@@ -47,6 +47,10 @@ env/
 # Redis
 dump.rdb
 
+# Reel engine outputs (large, local-only)
+assets/
+runs/
+
 # OS
 .DS_Store
 Thumbs.db
