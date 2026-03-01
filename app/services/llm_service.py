@@ -75,7 +75,11 @@ def generate_script_text(
     else:
         prompt_parts.append(base_prompt)
         if topic_anchor:
-            prompt_parts.append(f"The story/series is titled: \"{topic_anchor}\". The script must be clearly about this title and topic—not a generic theme.")
+            prompt_parts.append(
+                f"The story/series is titled: \"{topic_anchor}\". The script must be ONLY about this title and topic. "
+                "Do NOT write a generic script (e.g. generic ocean facts, generic kids facts). "
+                "If the title is not about ocean/kids facts, do not use that theme. Each series must feel distinct."
+            )
     if script_preferences:
         story_length = script_preferences.get("storyLength", "30_40")
         if story_length == "30_40":
@@ -121,7 +125,8 @@ def generate_script_text(
 
     prompt_parts.append(
         "Write only the script text, no stage directions or notes. "
-        "Make it engaging and suitable for a short-form video."
+        "Make it engaging and suitable for a short-form video. "
+        "Avoid repeating the same type of content (e.g. same 'fun facts' style) across episodes; keep this story specific to its title."
     )
     
     full_prompt = "\n".join(prompt_parts)
@@ -133,7 +138,8 @@ def generate_script_text(
                 {
                     "role": "system",
                     "content": "You are a professional scriptwriter for short-form video content. "
-                    "Create engaging, concise scripts optimized for social media platforms.",
+                    "Create engaging, concise scripts optimized for social media. "
+                    "Each script must be specifically about the given series/title—never a generic theme (e.g. generic ocean or kids facts) unless the title explicitly calls for it.",
                 },
                 {"role": "user", "content": full_prompt},
             ],
@@ -182,7 +188,7 @@ def generate_script_scenes(
         theme = f"custom: {custom_topic.get('topicTitle', theme)}"
     topic_anchor = (series_title or "").strip()
     if topic_anchor:
-        theme = f"{theme} about \"{topic_anchor}\" (the script must be clearly about this title/topic)"
+        theme = f"{theme} about \"{topic_anchor}\" only. Do NOT write generic content (e.g. generic ocean/kids facts); the story must be specifically and only about this title."
 
     length_sec = "30-40"
     if script_preferences:
@@ -196,7 +202,8 @@ def generate_script_scenes(
 
     system = (
         "You are a professional scriptwriter for short vertical videos (Reels/TikTok). "
-        "Output ONLY a valid JSON array of scenes. No markdown, no code fence, no explanation."
+        "Output ONLY a valid JSON array of scenes. No markdown, no code fence, no explanation. "
+        "Each script must be specifically about the given series/title—never a generic theme (e.g. generic ocean or kids facts) unless the title explicitly calls for it."
     )
     user = (
         f"Create a {theme} script for {length_sec} seconds of spoken content. "
@@ -206,7 +213,8 @@ def generate_script_scenes(
         '"text" (the exact narration for that scene, one or two sentences), '
         '"visual_description" (short cinematic visual for that moment: setting, mood. MUST contain no text/letters/words/subtitles/signage/watermarks). '
         "Keep visual_description under 100 words, cinematic and concrete. "
-        "Output a JSON array only, e.g. [{\"scene\":1,\"text\":\"...\",\"visual_description\":\"...\"}, ...]"
+        "Output a JSON array only, e.g. [{\"scene\":1,\"text\":\"...\",\"visual_description\":\"...\"}, ...] "
+        "Avoid repeating the same subject matter across episodes; keep this story specific to its title."
     )
     if total_episodes > 1:
         if episode_index <= 1:

@@ -207,6 +207,15 @@ def publish_now(
     if not account_ids:
         return {"success": False, "message": "No connected accounts to publish to", "publishedAt": None}
 
+    try:
+        uuids = [UUID(aid) for aid in account_ids if aid]
+    except (ValueError, TypeError):
+        uuids = []
+    accounts = (
+        db.query(SocialAccount).filter(SocialAccount.workspace_id == workspace.id, SocialAccount.id.in_(uuids)).all()
+    )
+    platforms = [getattr(a, "platform", "") for a in accounts]
+
     created = []
     for social_account_id in account_ids:
         post = Post(
@@ -220,4 +229,10 @@ def publish_now(
         post_to_platform.delay(str(post.id))
 
     db.commit()
-    return {"success": True, "postsEnqueued": len(created), "postIds": [str(p) for p in created], "publishedAt": None}
+    return {
+        "success": True,
+        "postsEnqueued": len(created),
+        "postIds": [str(p) for p in created],
+        "platforms": platforms,
+        "publishedAt": None,
+    }
