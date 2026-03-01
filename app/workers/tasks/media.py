@@ -5,6 +5,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
+from openai import OpenAIError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -75,7 +76,7 @@ def _resolve_music_asset(db: Session, series: Series, workspace_id: uuid.UUID) -
     return None
 
 
-@celery_app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
+@celery_app.task(bind=True, autoretry_for=(ConnectionError, TimeoutError), retry_backoff=True, max_retries=5)
 def generate_media(self, episode_id: str):
     db: Session = SessionLocal()
     episode = None
@@ -258,6 +259,18 @@ def generate_media(self, episode_id: str):
             "music_asset_id": str(music_asset_id) if music_asset_id else None,
             "caption_asset_id": str(caption_asset.id),
         }
+    except OpenAIError as e:
+        msg = str(e).lower()
+        if "insufficient_quota" in msg or "billing_hard_limit" in msg or "429" in msg:
+            user_msg = (
+                "OpenAI billing limit or quota exceeded. Add a payment method or upgrade your plan at "
+                "https://platform.openai.com/account/billing"
+            )
+            if episode:
+                episode.status = "failed"
+                episode.error = {"step": "media_generation", "message": user_msg, "raw": str(e)}
+                db.commit()
+            raise  # Fail task; retrying won't help until billing is fixed
     except Exception as e:
         if episode:
             episode.status = "failed"

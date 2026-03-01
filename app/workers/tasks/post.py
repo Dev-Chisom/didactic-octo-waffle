@@ -1,8 +1,11 @@
 """Post to platform APIs: upload video, set post.status and platform_post_id."""
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.db.base import SessionLocal
 from app.db.models.post import Post
@@ -67,6 +70,12 @@ def post_to_platform(self, post_id: str):
         else:
             post.status = "failed"
             post.error = err
+            logger.warning(
+                "post_to_platform failed: post_id=%s platform=%s error=%s",
+                post_id,
+                getattr(social_account, "platform", None),
+                err,
+            )
 
         db.commit()
         return {"post_id": post_id, "status": post.status, "platform_post_id": platform_post_id}

@@ -14,6 +14,8 @@ def estimate_credits_per_episode(series: Series) -> float:
     story_length = script_prefs.get("storyLength", "30_40")
     if story_length == "45_60":
         base += 5.0
+    elif story_length == "2_3_min":
+        base += 14.0  # 2-3 min per part
     art_style = series.art_style or {}
     style = art_style.get("style", "minimal_text")
     if style in ("cinematic_ai", "anime"):

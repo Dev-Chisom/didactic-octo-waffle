@@ -25,4 +25,14 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    beat_schedule={
+        "backfill-orphaned-episodes": {
+            "task": "app.workers.tasks.schedule.backfill_orphaned_episodes",
+            "schedule": 300.0,
+        },
+        "publish-due-episodes": {
+            "task": "app.workers.tasks.schedule.publish_due_episodes",
+            "schedule": 300.0,
+        },
+    },
 )

@@ -1,4 +1,4 @@
-"""Auth: register, login, token refresh, forgot/reset password."""
+"""Auth: register, login, token refresh, forgot/reset password, Google OAuth."""
 
 import secrets
 import uuid
@@ -6,6 +6,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 
+import httpx
+
+from app.config import get_settings
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -133,3 +136,87 @@ def reset_password(db: Session, token: str, new_password: str) -> None:
     user.password_hash = hash_password(new_password)
     db.delete(record)
     db.commit()
+
+
+def login_or_register_with_google(
+    db: Session,
+    code: str,
+    redirect_uri: str,
+) -> tuple[User, Workspace, str, str]:
+    """Exchange Google OAuth code for tokens, fetch profile, find or create user. Return (user, workspace, access, refresh)."""
+    settings = get_settings()
+    if not settings.google_client_id or not settings.google_client_secret:
+        raise ValueError("Google OAuth not configured")
+
+    resp = httpx.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "client_id": settings.google_client_id,
+            "client_secret": settings.google_client_secret,
+            "code": code,
+            "grant_type": "authorization_code",
+            "redirect_uri": redirect_uri,
+        },
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        timeout=15.0,
+    )
+    if resp.status_code != 200:
+        raise ValueError("Google token exchange failed")
+    token_data = resp.json()
+    access_token = token_data.get("access_token")
+    if not access_token:
+        raise ValueError("No access token from Google")
+
+    resp = httpx.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=10.0,
+    )
+    if resp.status_code != 200:
+        raise ValueError("Failed to fetch Google profile")
+    profile = resp.json()
+    email = profile.get("email")
+    if not email:
+        raise ValueError("Google profile missing email")
+
+    name = profile.get("name") or email.split("@")[0]
+
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        member = db.query(Member).filter(Member.user_id == user.id).first()
+        if not member:
+            raise ValueError("No workspace found")
+        workspace = db.query(Workspace).filter(Workspace.id == member.workspace_id).first()
+        if not workspace:
+            raise ValueError("Workspace not found")
+    else:
+        user = User(
+            id=uuid.uuid4(),
+            email=email,
+            password_hash=None,
+            name=name,
+            role="user",
+        )
+        db.add(user)
+        workspace = Workspace(
+            id=uuid.uuid4(),
+            owner_id=user.id,
+            plan="free",
+            credits_balance=0,
+            limits={"maxSeries": 1, "maxConnectedAccounts": 1},
+        )
+        db.add(workspace)
+        member = Member(
+            id=uuid.uuid4(),
+            workspace_id=workspace.id,
+            user_id=user.id,
+            role="owner",
+        )
+        db.add(member)
+        db.commit()
+        db.refresh(user)
+        db.refresh(workspace)
+
+    access = create_access_token(str(user.id))
+    refresh = create_refresh_token(str(user.id))
+    return user, workspace, access, refresh

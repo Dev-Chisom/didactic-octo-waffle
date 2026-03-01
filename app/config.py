@@ -69,6 +69,10 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("PUBLIC_BASE_URL", "BACKEND_PUBLIC_URL", "API_PUBLIC_BASE_URL"),
     )
 
+    # Google OAuth (login)
+    google_client_id: str = ""
+    google_client_secret: str = ""
+
     # Social OAuth
     tiktok_client_key: str = ""
     tiktok_client_secret: str = ""
@@ -87,14 +91,22 @@ class Settings(BaseSettings):
     openai_tts_model: str = "tts-1"
     elevenlabs_api_key: str = ""
 
-    # Video image
-    openai_generate_video_image: bool = True
-    openai_image_model: str = "dall-e-3"
+    # Image generation (Replicate primary, Pexels fallback)
+    replicate_api_token: str = ""
+    replicate_model_version: str = Field(
+        default="a00d0b7dcbb9c3fbb34ba87d2d5b46c56969c84a628bf778a7fdaec30b1b99c5",
+        description="Replicate SDXL model version (stability-ai/sdxl)",
+    )
+    pexels_api_key: str = ""
 
     # Scene-based video
     use_scene_based_video: bool = True
     video_scenes_min: int = 5
     video_scenes_max: int = 12
+
+    # Reel engine (story.py): when True, script generation uses reel_engine build_story_plan (style/topic/narration LLM or templates)
+    use_reel_engine_story: bool = True
+    reel_engine_cache_dir: Optional[str] = None  # Narration cache; None = no disk cache
 
     # Email
     smtp_host: str = ""

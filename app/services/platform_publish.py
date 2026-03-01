@@ -18,10 +18,7 @@ def _tiktok_publish(
     caption: str,
     post_id: str,
 ) -> dict[str, Any]:
-    """
-    TikTok Content Posting API: init upload (PULL_FROM_URL), then publish.
-    Requires video URL to be from a TikTok-verified domain or use FILE_UPLOAD.
-    """
+    """TikTok Content Posting API: PULL_FROM_URL init then publish."""
     settings = get_settings()
     if not settings.tiktok_client_key:
         raise ValueError("TikTok not configured")
@@ -30,7 +27,6 @@ def _tiktok_publish(
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     }
-    # Step 1: Initialize upload
     init_payload = {
         "post_info": {
             "title": caption[:150] if caption else "Video",
@@ -44,7 +40,7 @@ def _tiktok_publish(
         },
     }
     r = httpx.post(
-        "https://open.tiktokapis.com/v2/post/publish/inbox/video/init/",
+        "https://open.tiktokapis.com/v2/post/publish/video/init/",
         headers=headers,
         json=init_payload,
         timeout=30,
@@ -124,8 +120,6 @@ def _youtube_publish(
     to download the file and use resumable upload. Simplified: attempt insert
     with upload URL (YouTube may not support URL ingest); else fail with clear message.
     """
-    # YouTube does not support "publish from URL" directly; requires resumable upload.
-    # So we must download video and POST to uploads endpoint.
     r = httpx.get(video_url, timeout=120)
     r.raise_for_status()
     video_bytes = r.content
@@ -135,7 +129,6 @@ def _youtube_publish(
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     }
-    # Resumable upload: 1) POST to get upload URI 2) PUT body
     init = httpx.post(
         "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
         headers=headers,

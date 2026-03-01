@@ -50,6 +50,7 @@ dump.rdb
 # Reel engine outputs (large, local-only)
 assets/
 runs/
+.narration_cache/
 
 # OS
 .DS_Store

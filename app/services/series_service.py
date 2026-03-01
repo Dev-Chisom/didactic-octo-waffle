@@ -1,7 +1,7 @@
 """Series CRUD and wizard step updates."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
@@ -136,6 +136,7 @@ def update_step_7(db: Session, series: Series, effects: Optional[list[dict]]) ->
 def update_step_8(db: Session, series: Series, social_account_ids: Optional[list[uuid.UUID]]) -> Series:
     if social_account_ids is not None:
         series.connected_social_account_ids = [str(x) for x in social_account_ids]
+        series.auto_post_enabled = bool(series.connected_social_account_ids)
     db.commit()
     db.refresh(series)
     return series
@@ -158,15 +159,18 @@ def launch_series(
     """
     if series.status not in ("draft", "paused"):
         raise ValueError("Series cannot be launched in current state")
-    # Simple validation: required steps present
     if not series.script_preferences or not series.voice_language:
         raise ValueError("Complete required wizard steps before launch")
     credit_per = estimate_credits_per_episode(series)
     balance = workspace.credits_balance or 0
     schedule = series.schedule or {}
     frequency = schedule.get("frequency", "daily")
-    # Schedule next 7 episodes at future publish slots (so they show on Scheduled posts)
-    slots = get_next_publish_slots(schedule, count=7)
+    parts_per_story = schedule.get("partsPerStory")
+    if parts_per_story == 2:
+        episode_count = 2
+    else:
+        episode_count = 7
+    slots = get_next_publish_slots(schedule, count=episode_count)
     upcoming = []
     for i, slot_utc in enumerate(slots, start=1):
         ep = Episode(
@@ -189,8 +193,27 @@ def launch_series(
         pass  # already in schedule
     db.commit()
     db.refresh(series)
+
+    # Queue script generation 6 hours before each scheduled_at
+    from app.workers.tasks.script import generate_script
+
+    for item in upcoming:
+        ep_id = item.get("id")
+        scheduled_at_str = item.get("scheduledAt")
+        if not ep_id or not scheduled_at_str:
+            continue
+        try:
+            slot_utc = datetime.fromisoformat(scheduled_at_str.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            continue
+        eta = slot_utc - timedelta(hours=6)
+        if eta > datetime.now(timezone.utc):
+            generate_script.apply_async(args=[ep_id], eta=eta)
+        else:
+            generate_script.delay(ep_id)
+
     return series, upcoming, {
         "perEpisode": credit_per,
-        "estimatedMonthly": credit_per * (7 if frequency == "daily" else 12),
+        "estimatedMonthly": credit_per * (episode_count if frequency == "daily" else max(episode_count, 12)),
         "currentBalance": balance,
     }

@@ -180,7 +180,6 @@ def publish_now(
         )
 
     series = ep.series
-    # Resolve target accounts: series.connected_social_account_ids or all workspace connected
     account_ids = list(series.connected_social_account_ids or []) if series else []
     if not account_ids:
         accounts = (

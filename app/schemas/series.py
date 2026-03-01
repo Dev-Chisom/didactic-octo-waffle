@@ -28,7 +28,7 @@ class Step1ContentTypeUpdate(BaseModel):
 
 # ---- Step 2: Script preferences ----
 class Step2ScriptPreferencesUpdate(BaseModel):
-    storyLength: Optional[str] = None  # 30_40, 45_60
+    storyLength: Optional[str] = None
     tone: Optional[str] = None
     hookStrength: Optional[str] = None
     includeCta: Optional[bool] = None
@@ -134,6 +134,7 @@ class Step9ScheduleUpdate(BaseModel):
     timezone: Optional[str] = None
     startDate: Optional[str] = None  # date string
     active: Optional[bool] = None
+    partsPerStory: Optional[int] = None
 
 
 # ---- Series response ----
