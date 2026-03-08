@@ -12,9 +12,8 @@ from app.db.base import SessionLocal
 from app.db.models.asset import Asset
 from app.db.models.episode import Episode
 from app.services.storage_service import get_download_url, upload_file
+from app.utils.ffmpeg_filters import FPS_OUT, zoompan_vf as _zoompan_vf
 from app.workers.celery_app import celery_app
-
-FPS_OUT = 30
 
 
 def _download_asset_url(url: str) -> bytes:
@@ -43,17 +42,10 @@ def _ken_burns_segment(
     voice_path: str,
     duration: float,
     segment_path: str,
+    animation: dict | None = None,
 ) -> None:
     fps_out = FPS_OUT
-    num_frames = max(1, int(duration * fps_out))
-    zoom_end = 1.2
-    zoom_inc = (zoom_end - 1.0) / num_frames if num_frames else 0.0002
-    zoom_expr = f"min(zoom+{zoom_inc:.6f},{zoom_end})"
-    vf = (
-        "scale=1080:1920:force_original_aspect_ratio=decrease,"
-        "pad=1080:1920:(ow-iw)/2:(oh-ih)/2,"
-        f"zoompan=z='{zoom_expr}':d=1:s=1080x1920:fps={fps_out}"
-    )
+    vf = _zoompan_vf(duration, animation)
     if image_path and os.path.isfile(image_path):
         cmd = [
             "ffmpeg", "-y", "-loop", "1", "-i", image_path,
@@ -127,7 +119,10 @@ def render_video(self, episode_id: str):
                                     f.write(image_data)
 
                     seg_path = os.path.join(tmpdir, f"segment_{idx:04d}.mp4")
-                    _ken_burns_segment(tmpdir, image_path, voice_path, duration, seg_path)
+                    scene_animation = ref.get("animation") if isinstance(ref.get("animation"), dict) else None
+                    _ken_burns_segment(
+                        tmpdir, image_path, voice_path, duration, seg_path, animation=scene_animation
+                    )
                     segment_paths.append(seg_path)
 
                 if not segment_paths:

@@ -49,6 +49,17 @@ def create_app() -> FastAPI:
     app.include_router(api_router, prefix=settings.api_v1_prefix)
     app.include_router(billing_router)  # POST /webhooks/stripe (no auth)
 
+    @app.get("/")
+    def root():
+        """Root endpoint: API info and links."""
+        return {
+            "app": settings.app_name,
+            "docs": "/docs",
+            "redoc": "/redoc",
+            "api": settings.api_v1_prefix,
+            "demo": "/demo",
+        }
+
     # Demo page: create content and view it in the browser
     @app.get("/demo")
     def demo_page():

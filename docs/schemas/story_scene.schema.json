@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://api.auto-viral.example/schemas/story_scene.json",
+  "title": "StoryScene",
+  "description": "Single scene for long-form AI story video: narration or dialogue, image prompt, animation.",
+  "type": "object",
+  "required": ["scene", "text", "visual_description"],
+  "properties": {
+    "scene": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "1-based scene index"
+    },
+    "text": {
+      "type": "string",
+      "description": "Narration or dialogue line (for TTS)"
+    },
+    "visual_description": {
+      "type": "string",
+      "description": "Image generation prompt (no on-screen text)"
+    },
+    "scene_type": {
+      "type": "string",
+      "enum": ["narration", "dialogue"],
+      "default": "narration",
+      "description": "narration = background + narrator TTS; dialogue = character lip-sync"
+    },
+    "duration_seconds": {
+      "type": "number",
+      "minimum": 0.5,
+      "maximum": 60,
+      "description": "Hint for pacing; TTS duration overrides"
+    },
+    "character_id": {
+      "type": "string",
+      "description": "Required when scene_type=dialogue; references series character for face + voice"
+    },
+    "image_prompt": {
+      "type": "string",
+      "description": "Optional override for visual_description (e.g. for Replicate)"
+    },
+    "animation": {
+      "type": "object",
+      "description": "FFmpeg camera motion for background",
+      "properties": {
+        "motion": {
+          "type": "string",
+          "enum": [
+            "ken_burns_zoom",
+            "ken_burns_pan_left",
+            "ken_burns_pan_right",
+            "zoom_in",
+            "zoom_out",
+            "static"
+          ],
+          "default": "ken_burns_zoom"
+        },
+        "zoom_start": { "type": "number", "minimum": 1, "maximum": 2, "default": 1 },
+        "zoom_end": { "type": "number", "minimum": 1, "maximum": 2, "default": 1.2 },
+        "pan_x_start": { "type": "number", "default": 0 },
+        "pan_x_end": { "type": "number", "default": 0 },
+        "pan_y_start": { "type": "number", "default": 0 },
+        "pan_y_end": { "type": "number", "default": 0 }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional arc/emotion for analytics"
+    }
+  }
+}

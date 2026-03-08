@@ -127,14 +127,33 @@ def _replicate_generate(
         elif isinstance(output, list) and output and isinstance(output[0], str):
             url = output[0]
         if url and url.startswith(("http://", "https://")):
+            start = time.monotonic()
             try:
-                img_r = client.get(url, follow_redirects=True)
+                img_r = client.get(url, follow_redirects=True, timeout=60.0)
+                elapsed = time.monotonic() - start
                 if img_r.status_code == 200:
+                    logger.info(
+                        "Replicate image download succeeded: url=%s status=%s elapsed=%.2fs bytes=%d",
+                        url,
+                        img_r.status_code,
+                        elapsed,
+                        len(img_r.content or b""),
+                    )
                     return img_r.content
-            except httpx.ConnectError as e:
                 logger.warning(
-                    "Replicate image download failed (DNS/network): %s. URL host may be unreachable; check VPN/DNS.",
+                    "Replicate image download non-200: url=%s status=%s elapsed=%.2fs",
+                    url,
+                    img_r.status_code,
+                    elapsed,
+                )
+            except httpx.RequestError as e:
+                elapsed = time.monotonic() - start
+                logger.warning(
+                    "Replicate image download failed (DNS/network): %s url=%s elapsed=%.2fs. "
+                    "URL host may be unreachable; check VPN/DNS.",
                     e,
+                    url,
+                    elapsed,
                 )
                 return None
         return None
@@ -204,7 +223,7 @@ def generate_video_image(script_text: Optional[str] = None) -> Optional[bytes]:
     width = 720
     height = 1280
 
-    with httpx.Client(timeout=120) as client:
+    with httpx.Client(timeout=120, trust_env=False) as client:
         if settings.replicate_api_token:
             img = _replicate_generate(
                 client,
@@ -236,7 +255,7 @@ def generate_scene_image(visual_description: str, scene_index: int = 0) -> Optio
     height = 1280
     seed = 42 + scene_index
 
-    with httpx.Client(timeout=120) as client:
+    with httpx.Client(timeout=120, trust_env=False) as client:
         if settings.replicate_api_token:
             img = _replicate_generate(
                 client,

@@ -89,13 +89,61 @@ class Settings(BaseSettings):
 
     # TTS
     openai_tts_model: str = "tts-1"
-    elevenlabs_api_key: str = ""
+    elevenlabs_api_key: str = Field(
+        default="",
+        validation_alias="ELEVENLABS_API_KEY",
+        description="ElevenLabs API key (from https://elevenlabs.io/app/settings/api-keys).",
+    )
+    tts_provider: Literal["openai", "elevenlabs"] = Field(
+        default="openai",
+        validation_alias=AliasChoices("TTS_PROVIDER", "TTS_ENGINE"),
+        description="Global TTS provider: 'openai' or 'elevenlabs'.",
+    )
+    elevenlabs_voice_id: str = Field(
+        default="",
+        validation_alias="ELEVENLABS_VOICE_ID",
+        description="Default ElevenLabs voice id to use for TTS.",
+    )
+    elevenlabs_model_id: str = Field(
+        default="eleven_multilingual_v2",
+        validation_alias="ELEVENLABS_MODEL_ID",
+        description=(
+            "ElevenLabs TTS model id. Supported: eleven_v3 (5k chars), eleven_multilingual_v2 (10k), "
+            "eleven_flash_v2_5 / eleven_turbo_v2_5 (40k). Deprecated: eleven_monolingual_v1, eleven_multilingual_v1."
+        ),
+    )
+    elevenlabs_base_url: str = Field(
+        default="https://api.elevenlabs.io/v1",
+        validation_alias="ELEVENLABS_BASE_URL",
+        description="ElevenLabs API base URL (e.g. https://api.elevenlabs.io/v1).",
+    )
 
     # Image generation (Replicate primary, Pexels fallback)
     replicate_api_token: str = ""
     replicate_model_version: str = Field(
         default="a00d0b7dcbb9c3fbb34ba87d2d5b46c56969c84a628bf778a7fdaec30b1b99c5",
         description="Replicate SDXL model version (stability-ai/sdxl)",
+    )
+    # Avatar lip-sync (Replicate hosted model)
+    enable_avatar_lipsync: bool = Field(
+        default=True,
+        validation_alias="ENABLE_AVATAR_LIPSYNC",
+        description="When false, skip Replicate lip-sync and only generate avatar audio/image.",
+    )
+    replicate_lipsync_model_version: str = Field(
+        default="",
+        validation_alias="REPLICATE_LIPSYNC_MODEL_VERSION",
+        description="Replicate model version for avatar lip-sync (username/model:hash).",
+    )
+    replicate_lipsync_timeout_seconds: int = Field(
+        default=600,
+        validation_alias="REPLICATE_LIPSYNC_TIMEOUT_SECONDS",
+        description="Max seconds to wait for Replicate lip-sync (GPU-heavy; 5–10s audio ≈ 1 min, 60s audio ≈ 3–6 min).",
+    )
+    replicate_lipsync_poll_interval_seconds: float = Field(
+        default=3.0,
+        validation_alias="REPLICATE_LIPSYNC_POLL_INTERVAL_SECONDS",
+        description="Seconds between Replicate prediction polls (e.g. 3 to avoid hammering the API).",
     )
     pexels_api_key: str = ""
 
@@ -119,6 +167,11 @@ class Settings(BaseSettings):
 
     # Feature flags
     feature_flags: str = ""
+    enable_avatar_mode: bool = Field(
+        default=False,
+        validation_alias="ENABLE_AVATAR_MODE",
+        description="Enable avatar-based pipeline (lip-sync + talking head) instead of legacy Ken Burns video.",
+    )
 
     @property
     def celery_broker(self) -> str:

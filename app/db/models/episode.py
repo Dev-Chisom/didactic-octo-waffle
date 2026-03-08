@@ -55,6 +55,17 @@ class Episode(Base):
         nullable=True,
     )
     preview_url: Mapped[Optional[str]] = mapped_column("previewUrl", String(2048), nullable=True)
+    # Optional avatar / lip-sync specific fields (talking-head base video and job status).
+    avatar_video_url: Mapped[Optional[str]] = mapped_column(
+        "avatarVideoUrl",
+        String(2048),
+        nullable=True,
+    )
+    lipsync_status: Mapped[Optional[str]] = mapped_column(
+        "lipsyncStatus",
+        String(20),
+        nullable=True,
+    )  # PENDING, PROCESSING, DONE, FAILED
     error: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     credits_used: Mapped[float] = mapped_column("creditsUsed", Float, default=0)
     created_at: Mapped[datetime] = mapped_column(

@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://api.auto-viral.example/schemas/story_memory.json",
+  "title": "StoryMemory",
+  "description": "Consistency engine: passed into every scene/dialogue expansion so the model does not contradict past events.",
+  "type": "object",
+  "required": ["characters", "world_rules", "past_events"],
+  "properties": {
+    "characters": {
+      "type": "object",
+      "additionalProperties": { "type": "object" },
+      "description": "character_id -> character profile (goals, fears, secrets)"
+    },
+    "world_rules": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "From story world; no scene may contradict these"
+    },
+    "past_events": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "One-line summaries of key events so far; append after each expanded scene"
+    }
+  }
+}

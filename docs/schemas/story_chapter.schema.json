@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://api.auto-viral.example/schemas/story_chapter.json",
+  "title": "StoryChapter",
+  "description": "Chapter: major story phase. Each chapter expands into 20–40 scene seeds.",
+  "type": "object",
+  "required": ["chapter_number", "title"],
+  "properties": {
+    "chapter_number": { "type": "integer", "minimum": 1 },
+    "title": { "type": "string", "description": "e.g. The Silent Jungle, The Broken Temple" },
+    "summary": { "type": "string", "description": "Brief phase summary" },
+    "act": { "type": "integer", "minimum": 1, "maximum": 3, "description": "1, 2, or 3" },
+    "scene_range": {
+      "type": "array",
+      "items": { "type": "integer" },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Optional [start_scene_number, end_scene_number] for this chapter"
+    }
+  }
+}

@@ -3,6 +3,7 @@
 from uuid import UUID
 from typing import Optional
 from fastapi import APIRouter, HTTPException, status, Query
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import joinedload
 
 from app.dependencies import CurrentUser, CurrentWorkspace, DbSession
@@ -19,9 +20,13 @@ from app.workers.tasks.media import generate_media
 router = APIRouter(prefix="/episodes", tags=["episodes"])
 
 
+# Presigned URL expiry for episode preview (24h) so links work when shared.
+PREVIEW_URL_EXPIRY = 86400
+
+
 def _episode_to_response(ep: Episode, series_name: Optional[str] = None) -> EpisodeResponse:
-    """Build episode response in camelCase for FE contract; preview URLs resolved for client access."""
-    preview = get_download_url(ep.preview_url) if ep.preview_url else None
+    """Build episode response in camelCase for FE contract; preview URLs presigned for private S3."""
+    preview = get_download_url(ep.preview_url, expiration=PREVIEW_URL_EXPIRY) if ep.preview_url else None
     return EpisodeResponse(
         id=ep.id,
         seriesId=ep.series_id,
@@ -83,6 +88,34 @@ def get_episode(
     if not ep:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Episode not found")
     return _episode_to_response(ep, series_name=ep.series.name if ep.series else None)
+
+
+@router.get("/{id}/preview")
+def get_episode_preview_redirect(
+    id: UUID,
+    db: DbSession,
+    user: CurrentUser,
+    workspace: CurrentWorkspace,
+):
+    """
+    Redirect to a presigned URL for the episode's preview video.
+    Use this as the href for "Preview" so the browser gets a valid private-S3 URL (no Access Denied).
+    """
+    ep = (
+        db.query(Episode)
+        .join(Series, Episode.series_id == Series.id)
+        .filter(Series.workspace_id == workspace.id, Episode.id == id)
+        .first()
+    )
+    if not ep:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Episode not found")
+    if not ep.preview_url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No preview video for this episode yet.",
+        )
+    signed = get_download_url(ep.preview_url, expiration=PREVIEW_URL_EXPIRY)
+    return RedirectResponse(url=signed, status_code=302)
 
 
 @router.post("/{episode_id}/generate")

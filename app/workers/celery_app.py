@@ -14,6 +14,7 @@ celery_app = Celery(
         "app.workers.tasks.render",
         "app.workers.tasks.post",
         "app.workers.tasks.schedule",
+        "app.workers.tasks.avatar",
     ],
 )
 celery_app.conf.update(

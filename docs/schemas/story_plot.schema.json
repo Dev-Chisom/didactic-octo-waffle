@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://api.auto-viral.example/schemas/story_plot.json",
+  "title": "StoryPlot",
+  "description": "Three-act procedural plot arc filled by AI.",
+  "type": "object",
+  "required": ["inciting_incident", "climax", "resolution"],
+  "properties": {
+    "inciting_incident": { "type": "string" },
+    "rising_conflicts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Act 2 complications"
+    },
+    "midpoint_twist": { "type": "string" },
+    "betrayal_or_revelation": { "type": "string" },
+    "climax": { "type": "string" },
+    "resolution": { "type": "string" }
+  }
+}

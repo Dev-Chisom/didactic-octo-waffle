@@ -127,7 +127,7 @@ class Step8SocialUpdate(BaseModel):
 
 # ---- Step 9: Schedule ----
 class Step9ScheduleUpdate(BaseModel):
-    videoDuration: Optional[str] = None  # 30_40, 45_60
+    videoDuration: Optional[str] = None  # deprecated; backend always generates ~2-minute videos
     frequency: Optional[str] = None  # daily, 3x_per_week, custom
     customDays: Optional[list[int]] = None  # weekdays 0-6
     publishTime: Optional[str] = None  # time string

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://api.auto-viral.example/schemas/story_world.json",
+  "title": "StoryWorld",
+  "description": "Story world: rules of the universe. Everything in the story must obey these rules.",
+  "type": "object",
+  "required": ["world_id", "genre", "setting"],
+  "properties": {
+    "world_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$", "description": "Short alphanumeric id" },
+    "world_name": { "type": "string", "description": "Display name e.g. The Emerald Jungle" },
+    "genre": { "type": "string", "description": "e.g. adventure mystery, biopunk mystery" },
+    "setting": { "type": "string", "description": "e.g. floating jungle cities" },
+    "technology_level": { "type": "string", "description": "e.g. bio-organic machines" },
+    "magic_system": { "type": "string", "description": "Optional; use when genre is fantasy" },
+    "rules": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "maxItems": 10,
+      "description": "World rules that all events must obey (e.g. animals can speak during full moon)"
+    },
+    "society_rules": {
+      "type": "array",
+      "items": { "type": "string" },
+      "maxItems": 10,
+      "description": "Optional societal rules"
+    },
+    "visual_style": { "type": "string", "description": "For image generation e.g. cinematic jungle with fog and glowing plants" }
+  }
+}

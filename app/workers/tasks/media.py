@@ -13,6 +13,7 @@ from app.db.base import SessionLocal
 from app.db.models.asset import Asset
 from app.db.models.episode import Episode, Script
 from app.db.models.series import Series
+from app.services.cache import get_cached_tts_asset_id, set_cached_tts_asset_id
 from app.services.image_service import generate_scene_image, generate_video_image
 from app.services.storage_service import upload_bytes
 from app.services.tts_service import synthesize as tts_synthesize
@@ -20,6 +21,7 @@ from app.workers.celery_app import celery_app
 
 
 def _voice_id_from_series(voice_language: dict | None) -> str:
+    """OpenAI-style voice name from series (alloy, nova, onyx, etc.)."""
     if not voice_language:
         return "alloy"
     gender = (voice_language.get("gender") or "").lower()
@@ -29,6 +31,42 @@ def _voice_id_from_series(voice_language: dict | None) -> str:
     if "male" in gender:
         return "onyx" if "deep" in style else "echo"
     return "alloy"
+
+
+def _voice_id_for_scene(
+    voice_language: dict | None,
+    scene: dict,
+    default_elevenlabs_voice_id: str,
+) -> str:
+    """
+    Voice ID to use for this scene. When series has narratorVoiceId / characterVoices
+    (ElevenLabs IDs), use them so narrator vs character switch; otherwise return
+    OpenAI-style name for _voice_id_from_series behavior.
+    """
+    if not voice_language or not isinstance(voice_language, dict):
+        return _voice_id_from_series(voice_language)
+
+    # ElevenLabs-specific: explicit narrator + character voice IDs
+    narrator_id = (voice_language.get("narratorVoiceId") or "").strip()
+    character_voices = voice_language.get("characterVoices")
+    if isinstance(character_voices, dict):
+        character_voices = {k.strip(): (v or "").strip() for k, v in character_voices.items() if k and (v or "").strip()}
+    else:
+        character_voices = {}
+
+    scene_type = (scene.get("scene_type") or "narration").lower()
+    character_id = (scene.get("character_id") or "").strip()
+
+    if scene_type == "dialogue" and character_id and character_voices:
+        vid = character_voices.get(character_id) or character_voices.get(character_id.lower())
+        if vid:
+            return vid
+
+    if narrator_id:
+        return narrator_id
+    if default_elevenlabs_voice_id:
+        return default_elevenlabs_voice_id
+    return _voice_id_from_series(voice_language)
 
 
 def _probe_duration_seconds(audio_bytes: bytes) -> float:
@@ -94,7 +132,7 @@ def generate_media(self, episode_id: str):
         settings = get_settings()
         workspace_id = series.workspace_id
         meta = {"episode_id": episode_id}
-        voice_id = _voice_id_from_series(series.voice_language)
+        default_elevenlabs = (settings.elevenlabs_voice_id or "").strip()
         if not settings.openai_api_key:
             raise ValueError("OPENAI_API_KEY required for TTS")
 
@@ -117,25 +155,48 @@ def generate_media(self, episode_id: str):
                     vis = "soft abstract atmospheric background, gentle gradients, cinematic lighting, no text"
                 if not text:
                     raise ValueError(f"Scene {idx + 1} has no text")
-                audio_bytes = tts_synthesize(text, voice_id=voice_id)
-                duration = _probe_duration_seconds(audio_bytes)
-                key_voice = f"workspaces/{workspace_id}/episodes/{episode_id}/scene_{idx}_voice.mp3"
-                if settings.aws_access_key_id and settings.aws_secret_access_key:
-                    url_voice = upload_bytes(key_voice, audio_bytes, "audio/mpeg")
-                else:
-                    url_voice = f"https://storage.example.com/{key_voice}"
-                voice_asset = Asset(
-                    id=uuid.uuid4(),
-                    workspace_id=workspace_id,
-                    type="audio",
-                    source="generated",
-                    url=url_voice,
-                    format="audio/mpeg",
-                    duration_seconds=duration,
-                    metadata_={**meta, "role": "scene_voice", "scene_index": idx},
+                voice_id = _voice_id_for_scene(
+                    series.voice_language, scene, default_elevenlabs
                 )
-                db.add(voice_asset)
-                db.flush()
+                scene_type = (scene.get("scene_type") or "narration").lower()
+                emotion_tag = (scene.get("emotion") or "").strip() if scene_type == "dialogue" else None
+                cached_asset_id = get_cached_tts_asset_id(db, workspace_id, text, voice_id)
+                if cached_asset_id:
+                    existing = db.query(Asset).filter(
+                        Asset.id == cached_asset_id,
+                        Asset.workspace_id == workspace_id,
+                        Asset.type == "audio",
+                    ).first()
+                else:
+                    existing = None
+                if existing:
+                    voice_asset = existing
+                    duration = existing.duration_seconds if existing.duration_seconds is not None else 5.0
+                else:
+                    audio_bytes = tts_synthesize(
+                        text,
+                        voice_id=voice_id,
+                        emotion_tag=emotion_tag or None,
+                    )
+                    duration = _probe_duration_seconds(audio_bytes)
+                    key_voice = f"workspaces/{workspace_id}/episodes/{episode_id}/scene_{idx}_voice.mp3"
+                    if settings.aws_access_key_id and settings.aws_secret_access_key:
+                        url_voice = upload_bytes(key_voice, audio_bytes, "audio/mpeg")
+                    else:
+                        url_voice = f"https://storage.example.com/{key_voice}"
+                    voice_asset = Asset(
+                        id=uuid.uuid4(),
+                        workspace_id=workspace_id,
+                        type="audio",
+                        source="generated",
+                        url=url_voice,
+                        format="audio/mpeg",
+                        duration_seconds=duration,
+                        metadata_={**meta, "role": "scene_voice", "scene_index": idx},
+                    )
+                    db.add(voice_asset)
+                    db.flush()
+                    set_cached_tts_asset_id(db, workspace_id, voice_asset.id, text, voice_id)
                 image_asset_id = None
                 image_bytes = generate_scene_image(vis, scene_index=idx)
                 if image_bytes and settings.aws_access_key_id and settings.aws_secret_access_key:
@@ -191,24 +252,40 @@ def generate_media(self, episode_id: str):
             }
 
         # Legacy: single voice + single image
-        audio_bytes = tts_synthesize(script.text, voice_id=voice_id)
-        key_voice = f"workspaces/{workspace_id}/episodes/{episode_id}/voice.mp3"
-        if settings.aws_access_key_id and settings.aws_secret_access_key:
-            url_voice = upload_bytes(key_voice, audio_bytes, "audio/mpeg")
-        else:
-            url_voice = f"https://storage.example.com/{key_voice}"
-        voice_asset = Asset(
-            id=uuid.uuid4(),
-            workspace_id=workspace_id,
-            type="audio",
-            source="generated",
-            url=url_voice,
-            format="audio/mpeg",
-            duration_seconds=None,
-            metadata_={**meta, "role": "voice"},
+        voice_id = _voice_id_for_scene(
+            series.voice_language, {}, default_elevenlabs
         )
-        db.add(voice_asset)
-        db.flush()
+        cached_asset_id = get_cached_tts_asset_id(db, workspace_id, script.text, voice_id)
+        if cached_asset_id:
+            existing = db.query(Asset).filter(
+                Asset.id == cached_asset_id,
+                Asset.workspace_id == workspace_id,
+                Asset.type == "audio",
+            ).first()
+        else:
+            existing = None
+        if existing:
+            voice_asset = existing
+        else:
+            audio_bytes = tts_synthesize(script.text, voice_id=voice_id)
+            key_voice = f"workspaces/{workspace_id}/episodes/{episode_id}/voice.mp3"
+            if settings.aws_access_key_id and settings.aws_secret_access_key:
+                url_voice = upload_bytes(key_voice, audio_bytes, "audio/mpeg")
+            else:
+                url_voice = f"https://storage.example.com/{key_voice}"
+            voice_asset = Asset(
+                id=uuid.uuid4(),
+                workspace_id=workspace_id,
+                type="audio",
+                source="generated",
+                url=url_voice,
+                format="audio/mpeg",
+                duration_seconds=None,
+                metadata_={**meta, "role": "voice"},
+            )
+            db.add(voice_asset)
+            db.flush()
+            set_cached_tts_asset_id(db, workspace_id, voice_asset.id, script.text, voice_id)
         music_asset_id = _resolve_music_asset(db, series, workspace_id)
         caption_asset = Asset(
             id=uuid.uuid4(),

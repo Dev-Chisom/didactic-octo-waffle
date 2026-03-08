@@ -40,18 +40,8 @@ def _topic_from_series(series: Series) -> str:
 
 
 def _duration_sec_from_series(series: Series) -> float:
-    """Duration in seconds from script_preferences.storyLength."""
-    prefs = series.script_preferences or {}
-    if not isinstance(prefs, dict):
-        return 45.0
-    length = prefs.get("storyLength") or ""
-    if length == "30_40":
-        return 35.0
-    if length == "45_60":
-        return 50.0
-    if length == "2_3_min":
-        return 150.0
-    return 45.0
+    """Target duration in seconds. We generate 2-minute videos only."""
+    return 120.0
 
 
 def _episode_context(db: Session, episode: Episode) -> tuple[int, int, Optional[str]]:
@@ -172,13 +162,8 @@ def run_script_generation(db: Session, episode_id: uuid.UUID) -> dict[str, Any]:
             }
 
     if settings.use_scene_based_video:
-        prefs = series.script_preferences or {}
-        sl = prefs.get("storyLength", "30_40") if isinstance(prefs, dict) else "30_40"
-        if sl == "2_3_min":
-            scene_min, scene_max = 12, 24  # 2-3 min needs more scenes
-        else:
-            scene_min = settings.video_scenes_min
-            scene_max = settings.video_scenes_max
+        # 2-min videos: enough scenes for ~6–10 sec per scene
+        scene_min, scene_max = 12, 20
         scenes = generate_script_scenes(
             content_type=series.content_type,
             custom_topic=series.custom_topic,

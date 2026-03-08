@@ -1,5 +1,6 @@
 import uuid
 
+from app.config import get_settings
 from app.db.base import SessionLocal
 from app.db.models.episode import Episode
 from app.services.generation_service import run_script_generation
@@ -17,10 +18,18 @@ def generate_script(self, episode_id: str):
 
         result = run_script_generation(db, episode.id)
         db.refresh(episode)
-        # Chain media generation so video is ready before scheduled_at
-        from app.workers.tasks.media import generate_media
+        # Chain media generation so video is ready before scheduled_at.
+        settings = get_settings()
+        if getattr(settings, "enable_avatar_mode", False):
+            # Avatar mode: talking-head lip-sync pipeline (Replicate).
+            from app.workers.tasks.avatar import generate_avatar_video
 
-        generate_media.delay(episode_id)
+            generate_avatar_video.delay(episode_id)
+        else:
+            # Legacy pipeline: Ken Burns image + TTS render.
+            from app.workers.tasks.media import generate_media
+
+            generate_media.delay(episode_id)
         return {
             "episode_id": episode_id,
             "script_id": result.get("script_id"),

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://api.auto-viral.example/schemas/story_scene_seed.json",
+  "title": "StorySceneSeed",
+  "description": "Scene seed before dialogue expansion: location, conflict, emotion, image_prompt.",
+  "type": "object",
+  "required": ["scene_number", "location"],
+  "properties": {
+    "scene_number": { "type": "integer", "minimum": 1 },
+    "chapter": { "type": "integer", "minimum": 1, "description": "Chapter this scene belongs to" },
+    "chapter_number": { "type": "integer", "minimum": 1 },
+    "act": { "type": "integer", "minimum": 1, "maximum": 3, "description": "1, 2, or 3" },
+    "location": { "type": "string" },
+    "conflict": { "type": "string" },
+    "emotion": { "type": "string", "description": "e.g. suspense, tension, hope, dread" },
+    "characters_present": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "character_id list"
+    },
+    "image_prompt": {
+      "type": "string",
+      "description": "Visual description for image generation; no on-screen text"
+    },
+    "visual_prompt": {
+      "type": "string",
+      "description": "Alias for image_prompt"
+    }
+  }
+}

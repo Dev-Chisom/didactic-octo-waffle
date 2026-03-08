@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://api.auto-viral.example/schemas/story_character.json",
+  "title": "StoryCharacter",
+  "description": "Character with goals, fears, secrets for procedural dialogue conflict.",
+  "type": "object",
+  "required": ["name", "character_id", "role"],
+  "properties": {
+    "name": { "type": "string", "description": "Display name" },
+    "character_id": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Slug for lip-sync and references" },
+    "species": { "type": "string", "description": "e.g. jaguar, human (for consistency and image gen)" },
+    "role": { "type": "string", "description": "e.g. protagonist, antagonist, ally" },
+    "goal": { "type": "string", "description": "Drives dialogue and conflict" },
+    "fear": { "type": "string", "description": "Inner tension" },
+    "secret": { "type": "string", "description": "Optional revelation" },
+    "personality": { "type": "string", "description": "e.g. calm but suspicious" },
+    "relationship_to_others": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Brief relationship to other characters"
+    }
+  }
+}

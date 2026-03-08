@@ -81,14 +81,12 @@ def generate_script_text(
                 "If the title is not about ocean/kids facts, do not use that theme. Each series must feel distinct."
             )
     if script_preferences:
-        story_length = script_preferences.get("storyLength", "30_40")
-        if story_length == "30_40":
-            prompt_parts.append("Length: 30-40 seconds of spoken content")
-        elif story_length == "45_60":
-            prompt_parts.append("Length: 45-60 seconds of spoken content")
-        elif story_length == "2_3_min":
-            prompt_parts.append("Length: 2-3 minutes of spoken content per part (this is one part of a two-part story)")
-        
+        # We generate 2-minute videos only
+        if total_episodes > 1:
+            prompt_parts.append("Length: about 2 minutes of spoken content per part (this is one part of a multi-part story).")
+        else:
+            prompt_parts.append("Length: about 2 minutes of spoken content.")
+
         tone_pref = script_preferences.get("tone")
         if tone_pref:
             prompt_parts.append(f"Tone: {tone_pref}")
@@ -190,15 +188,8 @@ def generate_script_scenes(
     if topic_anchor:
         theme = f"{theme} about \"{topic_anchor}\" only. Do NOT write generic content (e.g. generic ocean/kids facts); the story must be specifically and only about this title."
 
-    length_sec = "30-40"
-    if script_preferences:
-        sl = script_preferences.get("storyLength", "30_40")
-        if sl == "45_60":
-            length_sec = "45-60"
-        elif sl == "2_3_min":
-            length_sec = "2-3 minutes"
-        else:
-            length_sec = "30-40"
+    # We generate 2-minute videos only
+    length_sec = "about 2 minutes"
 
     system = (
         "You are a professional scriptwriter for short vertical videos (Reels/TikTok). "
@@ -206,7 +197,7 @@ def generate_script_scenes(
         "Each script must be specifically about the given series/title—never a generic theme (e.g. generic ocean or kids facts) unless the title explicitly calls for it."
     )
     user = (
-        f"Create a {theme} script for {length_sec} seconds of spoken content. "
+        f"Create a {theme} script for {length_sec} of spoken content. "
         f"Split it into exactly {num_scenes_min} to {num_scenes_max} short scenes. "
         "For each scene provide: "
         '"scene" (1-based index), '

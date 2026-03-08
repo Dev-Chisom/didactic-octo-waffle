@@ -7,15 +7,9 @@ from app.db.models.workspace import Workspace
 def estimate_credits_per_episode(series: Series) -> float:
     """
     Compute per-episode credit consumption from series config.
-    Factors: length, voice, art style, premium effects.
+    We generate 2-minute videos only. Factors: voice, art style, premium effects.
     """
-    base = 10.0
-    script_prefs = series.script_preferences or {}
-    story_length = script_prefs.get("storyLength", "30_40")
-    if story_length == "45_60":
-        base += 5.0
-    elif story_length == "2_3_min":
-        base += 14.0  # 2-3 min per part
+    base = 24.0  # 2-min video baseline (was short-reel base + long-form uplift)
     art_style = series.art_style or {}
     style = art_style.get("style", "minimal_text")
     if style in ("cinematic_ai", "anime"):

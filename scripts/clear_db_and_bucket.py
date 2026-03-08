@@ -3,7 +3,7 @@
 Clear database (truncate all tables) and S3 bucket (delete all objects).
 
 Usage:
-  python scripts/clear_db_and_bucket.py [--db-only] [--bucket-only] [--yes]
+  python3 scripts/clear_db_and_bucket.py [--db-only] [--bucket-only] [--yes]
 """
 from __future__ import annotations
 
